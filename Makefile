@@ -1,4 +1,6 @@
 
+all: mandelbrot life hanoi fib hello
+
 mandelbrot:
 	./brainfuck -f examples/mandelbrot.bf -o mandelbrot.asm
 	nasm -f elf32 mandelbrot.asm
