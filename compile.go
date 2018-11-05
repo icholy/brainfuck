@@ -99,7 +99,7 @@ func CompileSetup(code *Code) {
 	code.Ins("extern putchar, getch")
 	code.Ins("global main")
 	code.Ins("segment .data")
-	code.Ins("%s times %s db 0", code.DataLabel(), code.DataMax())
+	code.Ins("%s times %d db 0", code.DataLabel(), code.DataMax())
 	code.Ins("segment .text")
 	code.Ins("main:")
 	code.Op("enter 0, 0")
