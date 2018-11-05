@@ -31,8 +31,7 @@ type Labels struct {
 	count int
 }
 
-func (l *Labels) Data() string  { return "Data" }
-func (l *Labels) Index() string { return "Index" }
+func (l *Labels) Data() string { return "Data" }
 
 func (l *Labels) Loop() (start, end string) {
 	l.count++
@@ -42,19 +41,15 @@ func (l *Labels) Loop() (start, end string) {
 func CompileOp(op Op, code *Code, labels *Labels) error {
 	switch op.Token {
 	case GT:
-		code.Op("add dword [%s], %d; %s", labels.Index(), op.Num, op)
+		code.Op("add ebx, %d; %s", op.Num, op)
 	case LT:
-		code.Op("sub dword [%s], %d; %s", labels.Index(), op.Num, op)
+		code.Op("sub ebx, %d; %s", op.Num, op)
 	case PLUS:
-		code.Op("mov eax, [%s]; %s", labels.Index(), op)
-		code.Op("add byte [%s+eax], %d", labels.Data(), op.Num)
+		code.Op("add byte [%s+ebx], %d", labels.Data(), op.Num)
 	case SUB:
-		code.Op("mov eax, [%s]; %s", labels.Index(), op)
-		code.Op("sub byte [%s+eax], %d", labels.Data(), op.Num)
+		code.Op("sub byte [%s+ebx], %d", labels.Data(), op.Num)
 	case DOT:
-		code.Op("xor eax, eax; .")
-		code.Op("mov al, [%s]", labels.Index())
-		code.Op("push dword [%s+eax]", labels.Data())
+		code.Op("push dword [%s+ebx]", labels.Data())
 		for i := 0; i < op.Num; i++ {
 			code.Op("call putchar")
 		}
@@ -63,7 +58,6 @@ func CompileOp(op Op, code *Code, labels *Labels) error {
 		for i := 0; i < op.Num; i++ {
 			code.Op("call getch; ,")
 		}
-		code.Op("mov ebx, [%s]", labels.Index())
 		code.Op("mov [%s+ebx], byte al", labels.Data())
 	default:
 		return fmt.Errorf("unsuported op: %s", op)
@@ -74,8 +68,7 @@ func CompileOp(op Op, code *Code, labels *Labels) error {
 func CompileLoop(loop Loop, code *Code, labels *Labels) error {
 	start, end := labels.Loop()
 	code.Ins("%s:", start)
-	code.Op("mov eax, [%s]; [", labels.Index())
-	code.Op("mov al, [%s+eax]", labels.Data())
+	code.Op("mov al, [%s+ebx]", labels.Data())
 	code.Op("cmp al, 0")
 	code.Op("je %s", end)
 	for _, n := range loop {
@@ -93,11 +86,11 @@ func CompileSetup(code *Code, labels *Labels) {
 	code.Ins("global main")
 	code.Ins("segment .data")
 	code.Ins("%s times 100000 db 0", labels.Data())
-	code.Ins("%s dd 0", labels.Index())
 	code.Ins("segment .text")
 	code.Ins("main:")
 	code.Op("enter 0, 0")
 	code.Op("pusha")
+	code.Op("mov ebx, 0")
 }
 
 func CompileCleanup(code *Code, labels *Labels) {
