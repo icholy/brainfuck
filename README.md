@@ -12,3 +12,7 @@ $ nasm -f elf32 mandelbrot.asm
 # link
 $ gcc -m32 -o mandelbrot mandelbrot.o
 ```
+
+# Demo
+
+![](tty.gif)
