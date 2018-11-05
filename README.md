@@ -1,6 +1,6 @@
 # Brainfuck Compiler
 
-> Compiles brainfuck programs to 32bit x86 nasm assembly
+> Compiles brainfuck programs to 32bit x86 [nasm](https://www.nasm.us/) assembly
 
 ``` sh
 # compile
