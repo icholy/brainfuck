@@ -5,11 +5,11 @@
 ``` 
 
 # compile
-$ ./brainfuck -f examples/hanoi.bf -o hanoi.asm
+$ ./brainfuck -f examples/hello.bf -o hello.asm
 
 # assemble
-$ nasm -f elf hanoi.asm
+$ nasm -f elf32 hello.asm
 
 # link
-$ gcc -m32 -o hanoi hanoi.o
+$ gcc -m32 -o hello hello.o
 ```
