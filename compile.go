@@ -120,14 +120,6 @@ func CompileNode(node Node, code *Code) error {
 		return CompileOp(node, code)
 	case Loop:
 		return CompileLoop(node, code)
-	case Program:
-		CompileSetup(code)
-		for _, n := range node {
-			if err := CompileNode(n, code); err != nil {
-				return err
-			}
-		}
-		CompileCleanup(code)
 	default:
 		return fmt.Errorf("unsuported node: %s", node)
 	}
@@ -136,8 +128,12 @@ func CompileNode(node Node, code *Code) error {
 
 func Compile(p Program) ([]string, error) {
 	var code Code
-	if err := CompileNode(p, &code); err != nil {
-		return nil, err
+	CompileSetup(&code)
+	for _, n := range p {
+		if err := CompileNode(n, &code); err != nil {
+			return nil, err
+		}
 	}
+	CompileCleanup(&code)
 	return code.Instructions, nil
 }
