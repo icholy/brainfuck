@@ -11,6 +11,7 @@ type Code struct {
 }
 
 func (c *Code) DataLabel() string { return "Data" }
+func (c *Code) DataMax() int      { return 100000 }
 
 func (c *Code) LoopLabels() (start, end string) {
 	c.labels++
@@ -98,7 +99,7 @@ func CompileSetup(code *Code) {
 	code.Ins("extern putchar, getch")
 	code.Ins("global main")
 	code.Ins("segment .data")
-	code.Ins("%s times 100000 db 0", code.DataLabel())
+	code.Ins("%s times %s db 0", code.DataLabel(), code.DataMax())
 	code.Ins("segment .text")
 	code.Ins("main:")
 	code.Op("enter 0, 0")
