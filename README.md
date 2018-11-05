@@ -11,5 +11,5 @@ $ ./brainfuck -f examples/hanoi.bf -o hanoi.asm
 $ nasm -f elf hanoi.asm
 
 # link
-$ ld -m elf_i386 -o hanoi hanoi.o -lc
+$ gcc -m32 -o hanoi hanoi.o
 ```
