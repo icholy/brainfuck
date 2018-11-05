@@ -149,12 +149,12 @@ func CompileOp(op Op, labels *Labels) ([]string, error) {
 			fmtOp("xor eax, eax; ."),
 			fmtOp("mov al, [%s]", labels.Index()),
 			fmtOp("push dword [%s+eax]", labels.Data()),
-			fmtOp("call _putchar"),
+			fmtOp("call putchar"),
 			fmtOp("pop ecx"),
 		}, nil
 	case COMMA:
 		return []string{
-			fmtOp("call _getch; ,"),
+			fmtOp("call getch; ,"),
 			fmtOp("mov ebx, [%s]", labels.Index()),
 			fmtOp("mov [%s+ebx], byte al", labels.Data()),
 		}, nil
@@ -187,13 +187,13 @@ func CompileLoop(loop Loop, labels *Labels) ([]string, error) {
 
 func CompileSetup(labels *Labels) []string {
 	return []string{
+		fmtIns("extern putchar, getch"),
+		fmtIns("global main"),
 		fmtIns("segment .data"),
 		fmtIns("%s times 100000 db 0", labels.Data()),
 		fmtIns("%s dd 0", labels.Index()),
 		fmtIns("segment .text"),
-		fmtIns("extern _putchar, _getch"),
-		fmtIns("global _asm_main"),
-		fmtIns("_asm_main:"),
+		fmtIns("main:"),
 		fmtOp("enter 0, 0"),
 		fmtOp("pusha"),
 	}
@@ -216,7 +216,7 @@ func fmtIns(format string, args ...interface{}) string {
 func fmtOp(format string, args ...interface{}) string {
 	s := fmt.Sprintf(format, args...)
 	parts := strings.SplitN(s, " ", 2)
-	s = fmt.Sprintf("\t%s\t\t%s", parts[0], strings.Join(parts[1:], " "))
+	s = fmt.Sprintf("\t%s \t\t%s", parts[0], strings.Join(parts[1:], " "))
 	parts = strings.SplitN(s, ";", 2)
 	if len(parts) == 1 {
 		return parts[0]
