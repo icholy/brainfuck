@@ -2,8 +2,7 @@
 
 > Compiles brainfuck programs to 32bit x86 nasm assembly
 
-``` 
-
+``` sh
 # compile
 $ ./brainfuck -f examples/hello.bf -o hello.asm
 
