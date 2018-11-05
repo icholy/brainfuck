@@ -4,11 +4,11 @@
 
 ``` sh
 # compile
-$ ./brainfuck -f examples/hello.bf -o hello.asm
+$ ./brainfuck -f examples/mandelbrot.bf -o mandelbrot.asm
 
 # assemble
-$ nasm -f elf32 hello.asm
+$ nasm -f elf32 mandelbrot.asm
 
 # link
-$ gcc -m32 -o hello hello.o
+$ gcc -m32 -o mandelbrot mandelbrot.o
 ```
