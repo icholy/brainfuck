@@ -38,13 +38,29 @@ func (c *Code) Op(format string, args ...interface{}) {
 func CompileOp(op Op, code *Code) error {
 	switch op.Token {
 	case GT:
-		code.Op("add ebx, %d; %s", op.Num, op)
+		if op.Num == 1 {
+			code.Op("inc ebx; %s", op)
+		} else {
+			code.Op("add ebx, %d; %s", op.Num, op)
+		}
 	case LT:
-		code.Op("sub ebx, %d; %s", op.Num, op)
+		if op.Num == 1 {
+			code.Op("dec ebx; %s", op)
+		} else {
+			code.Op("sub ebx, %d; %s", op.Num, op)
+		}
 	case PLUS:
-		code.Op("add byte [%s+ebx], %d", code.DataLabel(), op.Num)
+		if op.Num == 1 {
+			code.Op("inc byte [%s+ebx]; %s", code.DataLabel(), op)
+		} else {
+			code.Op("add byte [%s+ebx], %d; %s", code.DataLabel(), op.Num, op)
+		}
 	case SUB:
-		code.Op("sub byte [%s+ebx], %d", code.DataLabel(), op.Num)
+		if op.Num == 1 {
+			code.Op("dec byte [%s+ebx]; %s", code.DataLabel(), op)
+		} else {
+			code.Op("sub byte [%s+ebx], %d; %s", code.DataLabel(), op.Num, op)
+		}
 	case DOT:
 		code.Op("push dword [%s+ebx]", code.DataLabel())
 		for i := 0; i < op.Num; i++ {
