@@ -6,7 +6,15 @@ import (
 )
 
 type Code struct {
+	labels       int
 	Instructions []string
+}
+
+func (c *Code) DataLabel() string { return "Data" }
+
+func (c *Code) LoopLabels() (start, end string) {
+	c.labels++
+	return fmt.Sprintf("loop_%d", c.labels), fmt.Sprintf("end_loop_%d", c.labels)
 }
 
 func (c *Code) Ins(format string, args ...interface{}) {
@@ -27,29 +35,18 @@ func (c *Code) Op(format string, args ...interface{}) {
 	c.Instructions = append(c.Instructions, s)
 }
 
-type Labels struct {
-	count int
-}
-
-func (l *Labels) Data() string { return "Data" }
-
-func (l *Labels) Loop() (start, end string) {
-	l.count++
-	return fmt.Sprintf("loop_%d", l.count), fmt.Sprintf("end_loop_%d", l.count)
-}
-
-func CompileOp(op Op, code *Code, labels *Labels) error {
+func CompileOp(op Op, code *Code) error {
 	switch op.Token {
 	case GT:
 		code.Op("add ebx, %d; %s", op.Num, op)
 	case LT:
 		code.Op("sub ebx, %d; %s", op.Num, op)
 	case PLUS:
-		code.Op("add byte [%s+ebx], %d", labels.Data(), op.Num)
+		code.Op("add byte [%s+ebx], %d", code.DataLabel(), op.Num)
 	case SUB:
-		code.Op("sub byte [%s+ebx], %d", labels.Data(), op.Num)
+		code.Op("sub byte [%s+ebx], %d", code.DataLabel(), op.Num)
 	case DOT:
-		code.Op("push dword [%s+ebx]", labels.Data())
+		code.Op("push dword [%s+ebx]", code.DataLabel())
 		for i := 0; i < op.Num; i++ {
 			code.Op("call putchar")
 		}
@@ -58,21 +55,21 @@ func CompileOp(op Op, code *Code, labels *Labels) error {
 		for i := 0; i < op.Num; i++ {
 			code.Op("call getch; ,")
 		}
-		code.Op("mov [%s+ebx], byte al", labels.Data())
+		code.Op("mov [%s+ebx], byte al", code.DataLabel())
 	default:
 		return fmt.Errorf("unsuported op: %s", op)
 	}
 	return nil
 }
 
-func CompileLoop(loop Loop, code *Code, labels *Labels) error {
-	start, end := labels.Loop()
+func CompileLoop(loop Loop, code *Code) error {
+	start, end := code.LoopLabels()
 	code.Ins("%s:", start)
-	code.Op("mov al, [%s+ebx]", labels.Data())
+	code.Op("mov al, [%s+ebx]", code.DataLabel())
 	code.Op("cmp al, 0")
 	code.Op("je %s", end)
 	for _, n := range loop {
-		if err := CompileNode(n, code, labels); err != nil {
+		if err := CompileNode(n, code); err != nil {
 			return err
 		}
 	}
@@ -81,11 +78,11 @@ func CompileLoop(loop Loop, code *Code, labels *Labels) error {
 	return nil
 }
 
-func CompileSetup(code *Code, labels *Labels) {
+func CompileSetup(code *Code) {
 	code.Ins("extern putchar, getch")
 	code.Ins("global main")
 	code.Ins("segment .data")
-	code.Ins("%s times 100000 db 0", labels.Data())
+	code.Ins("%s times 100000 db 0", code.DataLabel())
 	code.Ins("segment .text")
 	code.Ins("main:")
 	code.Op("enter 0, 0")
@@ -93,27 +90,27 @@ func CompileSetup(code *Code, labels *Labels) {
 	code.Op("mov ebx, 0")
 }
 
-func CompileCleanup(code *Code, labels *Labels) {
+func CompileCleanup(code *Code) {
 	code.Op("popa")
 	code.Op("mov eax, 0")
 	code.Op("leave")
 	code.Op("ret")
 }
 
-func CompileNode(node Node, code *Code, labels *Labels) error {
+func CompileNode(node Node, code *Code) error {
 	switch node := node.(type) {
 	case Op:
-		return CompileOp(node, code, labels)
+		return CompileOp(node, code)
 	case Loop:
-		return CompileLoop(node, code, labels)
+		return CompileLoop(node, code)
 	case Program:
-		CompileSetup(code, labels)
+		CompileSetup(code)
 		for _, n := range node {
-			if err := CompileNode(n, code, labels); err != nil {
+			if err := CompileNode(n, code); err != nil {
 				return err
 			}
 		}
-		CompileCleanup(code, labels)
+		CompileCleanup(code)
 	default:
 		return fmt.Errorf("unsuported node: %s", node)
 	}
@@ -121,11 +118,8 @@ func CompileNode(node Node, code *Code, labels *Labels) error {
 }
 
 func Compile(p Program) ([]string, error) {
-	var (
-		labels Labels
-		code   Code
-	)
-	if err := CompileNode(p, &code, &labels); err != nil {
+	var code Code
+	if err := CompileNode(p, &code); err != nil {
 		return nil, err
 	}
 	return code.Instructions, nil
