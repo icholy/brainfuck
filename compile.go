@@ -18,39 +18,52 @@ func (l *Labels) Loop() (start, end string) {
 }
 
 func CompileOp(op Op, labels *Labels) ([]string, error) {
-	switch Token(op) {
+	switch op.Token {
 	case GT:
 		return []string{
-			fmtOp("inc dword [%s]; >", labels.Index()),
+			fmtOp("add dword [%s], %d; %s", labels.Index(), op.Num, op),
 		}, nil
 	case LT:
 		return []string{
-			fmtOp("dec dword [%s]; <", labels.Index()),
+			fmtOp("sub dword [%s], %d; %s", labels.Index(), op.Num, op),
 		}, nil
 	case PLUS:
 		return []string{
-			fmtOp("mov eax, [%s]; +", labels.Index()),
-			fmtOp("inc byte [%s+eax]", labels.Data()),
+			fmtOp("mov eax, [%s]; %s", labels.Index(), op),
+			fmtOp("add byte [%s+eax], %d", labels.Data(), op.Num),
 		}, nil
 	case SUB:
 		return []string{
-			fmtOp("mov eax, [%s]; -", labels.Index()),
-			fmtOp("dec byte [%s+eax]", labels.Data()),
+			fmtOp("mov eax, [%s]; %s", labels.Index(), op),
+			fmtOp("sub byte [%s+eax], %d", labels.Data(), op.Num),
 		}, nil
 	case DOT:
-		return []string{
+		instructions := []string{
 			fmtOp("xor eax, eax; ."),
 			fmtOp("mov al, [%s]", labels.Index()),
 			fmtOp("push dword [%s+eax]", labels.Data()),
-			fmtOp("call putchar"),
+		}
+		for i := 0; i < op.Num; i++ {
+			instructions = append(instructions,
+				fmtOp("call putchar"),
+			)
+		}
+		instructions = append(instructions,
 			fmtOp("pop ecx"),
-		}, nil
+		)
+		return instructions, nil
 	case COMMA:
-		return []string{
-			fmtOp("call getch; ,"),
+		var instructions []string
+		for i := 0; i < op.Num; i++ {
+			instructions = append(instructions,
+				fmtOp("call getch; ,"),
+			)
+		}
+		instructions = append(instructions,
 			fmtOp("mov ebx, [%s]", labels.Index()),
 			fmtOp("mov [%s+ebx], byte al", labels.Data()),
-		}, nil
+		)
+		return instructions, nil
 	default:
 		return nil, fmt.Errorf("unsuported op: %s", op)
 	}

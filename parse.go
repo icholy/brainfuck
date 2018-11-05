@@ -7,9 +7,26 @@ import (
 
 type Node interface{ fmt.Stringer }
 
-type Op Token
+type Op struct {
+	Token Token
+	Num   int
+}
 
-func (o Op) String() string { return string(o) }
+func (o Op) String() string {
+	if o.Num == 0 {
+		return string(o.Token)
+	}
+	return fmt.Sprintf("(%s:%d)", o.Token, o.Num)
+}
+
+type RepeatedOp struct {
+	Op  Op
+	Num int
+}
+
+func (r RepeatedOp) String() string {
+	return fmt.Sprintf("(%s*%d)", r.Op, r.Num)
+}
 
 type Loop []Node
 
@@ -29,6 +46,19 @@ func (p Program) String() string {
 		nodes[i] = n.String()
 	}
 	return strings.Join(nodes, ", ")
+}
+
+func ParseOp(pos int, tokens []Token) (Op, int, error) {
+	op := Op{Token: tokens[pos]}
+	for pos = pos; pos < len(tokens); pos++ {
+		if tokens[pos] == op.Token {
+			op.Num++
+		} else {
+			pos--
+			break
+		}
+	}
+	return op, pos, nil
 }
 
 func ParseNodes(pos int, tokens []Token) ([]Node, int, error) {
@@ -53,7 +83,12 @@ func ParseNodes(pos int, tokens []Token) ([]Node, int, error) {
 			pos = lpos
 			nodes = append(nodes, Loop(lnodes))
 		default:
-			nodes = append(nodes, Op(tok))
+			onode, opos, err := ParseOp(pos, tokens)
+			if err != nil {
+				return nil, opos, err
+			}
+			pos = opos
+			nodes = append(nodes, onode)
 		}
 	}
 	return nil, 0, fmt.Errorf("missing %s", EOF)
