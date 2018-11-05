@@ -70,7 +70,7 @@ func CompileOp(op Op, code *Code) error {
 		code.Op("pop ecx")
 	case COMMA:
 		for i := 0; i < op.Num; i++ {
-			code.Op("call getch; ,")
+			code.Op("call getchar; ,")
 		}
 		code.Op("mov [%s+ebx], byte al", code.DataLabel())
 	default:
@@ -96,7 +96,7 @@ func CompileLoop(loop Loop, code *Code) error {
 }
 
 func CompileSetup(code *Code) {
-	code.Ins("extern putchar, getch")
+	code.Ins("extern putchar, getchar")
 	code.Ins("global main")
 	code.Ins("segment .data")
 	code.Ins("%s times %d db 0", code.DataLabel(), code.DataMax())
