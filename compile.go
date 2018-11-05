@@ -5,6 +5,28 @@ import (
 	"strings"
 )
 
+type Code struct {
+	Instructions []string
+}
+
+func (c *Code) Ins(format string, args ...interface{}) {
+	s := fmt.Sprintf(format, args...)
+	c.Instructions = append(c.Instructions, s)
+}
+
+func (c *Code) Op(format string, args ...interface{}) {
+	s := fmt.Sprintf(format, args...)
+	parts := strings.SplitN(s, " ", 2)
+	s = fmt.Sprintf("\t%s \t\t%s", parts[0], strings.Join(parts[1:], " "))
+	parts = strings.SplitN(s, ";", 2)
+	if len(parts) == 1 {
+		s = parts[0]
+	} else {
+		s = fmt.Sprintf("%s\t\t\t;%s", parts[0], strings.Join(parts[1:], ";"))
+	}
+	c.Instructions = append(c.Instructions, s)
+}
+
 type Labels struct {
 	count int
 }
@@ -17,150 +39,101 @@ func (l *Labels) Loop() (start, end string) {
 	return fmt.Sprintf("loop_%d", l.count), fmt.Sprintf("end_loop_%d", l.count)
 }
 
-func CompileOp(op Op, labels *Labels) ([]string, error) {
+func CompileOp(op Op, code *Code, labels *Labels) error {
 	switch op.Token {
 	case GT:
-		return []string{
-			fmtOp("add dword [%s], %d; %s", labels.Index(), op.Num, op),
-		}, nil
+		code.Op("add dword [%s], %d; %s", labels.Index(), op.Num, op)
 	case LT:
-		return []string{
-			fmtOp("sub dword [%s], %d; %s", labels.Index(), op.Num, op),
-		}, nil
+		code.Op("sub dword [%s], %d; %s", labels.Index(), op.Num, op)
 	case PLUS:
-		return []string{
-			fmtOp("mov eax, [%s]; %s", labels.Index(), op),
-			fmtOp("add byte [%s+eax], %d", labels.Data(), op.Num),
-		}, nil
+		code.Op("mov eax, [%s]; %s", labels.Index(), op)
+		code.Op("add byte [%s+eax], %d", labels.Data(), op.Num)
 	case SUB:
-		return []string{
-			fmtOp("mov eax, [%s]; %s", labels.Index(), op),
-			fmtOp("sub byte [%s+eax], %d", labels.Data(), op.Num),
-		}, nil
+		code.Op("mov eax, [%s]; %s", labels.Index(), op)
+		code.Op("sub byte [%s+eax], %d", labels.Data(), op.Num)
 	case DOT:
-		instructions := []string{
-			fmtOp("xor eax, eax; ."),
-			fmtOp("mov al, [%s]", labels.Index()),
-			fmtOp("push dword [%s+eax]", labels.Data()),
-		}
+		code.Op("xor eax, eax; .")
+		code.Op("mov al, [%s]", labels.Index())
+		code.Op("push dword [%s+eax]", labels.Data())
 		for i := 0; i < op.Num; i++ {
-			instructions = append(instructions,
-				fmtOp("call putchar"),
-			)
+			code.Op("call putchar")
 		}
-		instructions = append(instructions,
-			fmtOp("pop ecx"),
-		)
-		return instructions, nil
+		code.Op("pop ecx")
 	case COMMA:
-		var instructions []string
 		for i := 0; i < op.Num; i++ {
-			instructions = append(instructions,
-				fmtOp("call getch; ,"),
-			)
+			code.Op("call getch; ,")
 		}
-		instructions = append(instructions,
-			fmtOp("mov ebx, [%s]", labels.Index()),
-			fmtOp("mov [%s+ebx], byte al", labels.Data()),
-		)
-		return instructions, nil
+		code.Op("mov ebx, [%s]", labels.Index())
+		code.Op("mov [%s+ebx], byte al", labels.Data())
 	default:
-		return nil, fmt.Errorf("unsuported op: %s", op)
+		return fmt.Errorf("unsuported op: %s", op)
 	}
+	return nil
 }
 
-func CompileLoop(loop Loop, labels *Labels) ([]string, error) {
+func CompileLoop(loop Loop, code *Code, labels *Labels) error {
 	start, end := labels.Loop()
-	instructions := []string{
-		fmtIns("%s:", start),
-		fmtOp("mov eax, [%s]; [", labels.Index()),
-		fmtOp("mov al, [%s+eax]", labels.Data()),
-		fmtOp("cmp al, 0"),
-		fmtOp("je %s", end),
-	}
+	code.Ins("%s:", start)
+	code.Op("mov eax, [%s]; [", labels.Index())
+	code.Op("mov al, [%s+eax]", labels.Data())
+	code.Op("cmp al, 0")
+	code.Op("je %s", end)
 	for _, n := range loop {
-		ins, err := CompileNode(n, labels)
-		if err != nil {
-			return nil, err
+		if err := CompileNode(n, code, labels); err != nil {
+			return err
 		}
-		instructions = append(instructions, ins...)
 	}
-	return append(instructions,
-		fmtOp("jmp %s; ]", start),
-		fmtIns("%s:", end),
-	), nil
+	code.Op("jmp %s; ]", start)
+	code.Ins("%s:", end)
+	return nil
 }
 
-func CompileSetup(labels *Labels) []string {
-	return []string{
-		fmtIns("extern putchar, getch"),
-		fmtIns("global main"),
-		fmtIns("segment .data"),
-		fmtIns("%s times 100000 db 0", labels.Data()),
-		fmtIns("%s dd 0", labels.Index()),
-		fmtIns("segment .text"),
-		fmtIns("main:"),
-		fmtOp("enter 0, 0"),
-		fmtOp("pusha"),
-	}
+func CompileSetup(code *Code, labels *Labels) {
+	code.Ins("extern putchar, getch")
+	code.Ins("global main")
+	code.Ins("segment .data")
+	code.Ins("%s times 100000 db 0", labels.Data())
+	code.Ins("%s dd 0", labels.Index())
+	code.Ins("segment .text")
+	code.Ins("main:")
+	code.Op("enter 0, 0")
+	code.Op("pusha")
 }
 
-func CompileCleanup(labels *Labels) []string {
-	return []string{
-		fmtOp("popa"),
-		fmtOp("mov eax, 0"),
-		fmtOp("leave"),
-		fmtOp("ret"),
-	}
+func CompileCleanup(code *Code, labels *Labels) {
+	code.Op("popa")
+	code.Op("mov eax, 0")
+	code.Op("leave")
+	code.Op("ret")
 }
 
-func fmtIns(format string, args ...interface{}) string {
-	return fmt.Sprintf(format, args...)
-}
-
-func fmtOp(format string, args ...interface{}) string {
-	s := fmt.Sprintf(format, args...)
-	parts := strings.SplitN(s, " ", 2)
-	s = fmt.Sprintf("\t%s \t\t%s", parts[0], strings.Join(parts[1:], " "))
-	parts = strings.SplitN(s, ";", 2)
-	if len(parts) == 1 {
-		return parts[0]
-	}
-	return fmt.Sprintf("%s\t\t\t;%s", parts[0], strings.Join(parts[1:], ";"))
-}
-
-func CompileNode(node Node, labels *Labels) ([]string, error) {
-	var instructions []string
+func CompileNode(node Node, code *Code, labels *Labels) error {
 	switch node := node.(type) {
 	case Op:
-		ins, err := CompileOp(node, labels)
-		if err != nil {
-			return nil, err
-		}
-		instructions = append(instructions, ins...)
+		return CompileOp(node, code, labels)
 	case Loop:
-		ins, err := CompileLoop(node, labels)
-		if err != nil {
-			return nil, err
-		}
-		instructions = append(instructions, ins...)
+		return CompileLoop(node, code, labels)
 	case Program:
-		instructions = append(instructions, CompileSetup(labels)...)
+		CompileSetup(code, labels)
 		for _, n := range node {
-			ins, err := CompileNode(n, labels)
-			if err != nil {
-				return nil, err
+			if err := CompileNode(n, code, labels); err != nil {
+				return err
 			}
-			instructions = append(instructions, ins...)
 		}
-		instructions = append(instructions, CompileCleanup(labels)...)
+		CompileCleanup(code, labels)
 	default:
-		return nil, fmt.Errorf("unsuported node: %s", node)
+		return fmt.Errorf("unsuported node: %s", node)
 	}
-	return instructions, nil
+	return nil
 }
 
 func Compile(p Program) ([]string, error) {
-	var labels Labels
-	return CompileNode(p, &labels)
+	var (
+		labels Labels
+		code   Code
+	)
+	if err := CompileNode(p, &code, &labels); err != nil {
+		return nil, err
+	}
+	return code.Instructions, nil
 }
