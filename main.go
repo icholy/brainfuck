@@ -22,10 +22,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	instructions, err := Compile(program)
-	if err != nil {
-		log.Fatal(err)
-	}
+	instructions := Compile(program)
 	assembly := strings.Join(instructions, "\n")
 	if err := ioutil.WriteFile(outfile, []byte(assembly), os.ModePerm); err != nil {
 		log.Fatal(err)

@@ -18,122 +18,105 @@ func (c *Code) LoopLabels() (start, end string) {
 	return fmt.Sprintf("loop_%d", c.labels), fmt.Sprintf("end_loop_%d", c.labels)
 }
 
-func (c *Code) Ins(format string, args ...interface{}) {
-	s := fmt.Sprintf(format, args...)
-	c.Instructions = append(c.Instructions, s)
-}
-
-func (c *Code) Op(format string, args ...interface{}) {
-	s := fmt.Sprintf(format, args...)
-	parts := strings.SplitN(s, " ", 2)
-	s = fmt.Sprintf("\t%s \t\t%s", parts[0], strings.Join(parts[1:], " "))
-	parts = strings.SplitN(s, ";", 2)
-	if len(parts) == 1 {
-		s = parts[0]
-	} else {
-		s = fmt.Sprintf("%s\t\t\t;%s", parts[0], strings.Join(parts[1:], ";"))
+func formatIns(ins, params string, args ...interface{}) string {
+	indent := strings.Repeat(" ", 8)
+	params = fmt.Sprintf(params, args...)
+	if params == "" {
+		return indent + ins
 	}
-	c.Instructions = append(c.Instructions, s)
+	ins = fmt.Sprintf("%-10s", ins)
+	return indent + ins + params
 }
 
-func CompileOp(op Op, code *Code) error {
+func (c *Code) add(s string)                                { c.Instructions = append(c.Instructions, s) }
+func (c *Code) addf(format string, args ...interface{})     { c.add(fmt.Sprintf(format, args...)) }
+func (c *Code) Dir(format string, args ...interface{})      { c.addf(format, args...) }
+func (c *Code) Label(name string)                           { c.addf("%s:", name) }
+func (c *Code) Ins(ins, params string, args ...interface{}) { c.add(formatIns(ins, params, args...)) }
+
+func CompileOp(op Op, code *Code) {
 	switch op.Token {
 	case GT:
 		if op.Num == 1 {
-			code.Op("inc ebx; %s", op)
+			code.Ins("inc", "ebx")
 		} else {
-			code.Op("add ebx, %d; %s", op.Num, op)
+			code.Ins("add", "ebx, %d", op.Num)
 		}
 	case LT:
 		if op.Num == 1 {
-			code.Op("dec ebx; %s", op)
+			code.Ins("dec", "ebx")
 		} else {
-			code.Op("sub ebx, %d; %s", op.Num, op)
+			code.Ins("sub", "ebx, %d", op.Num)
 		}
 	case PLUS:
 		if op.Num == 1 {
-			code.Op("inc byte [%s+ebx]; %s", code.DataLabel(), op)
+			code.Ins("inc", "byte [%s+ebx]", code.DataLabel())
 		} else {
-			code.Op("add byte [%s+ebx], %d; %s", code.DataLabel(), op.Num, op)
+			code.Ins("add", "byte [%s+ebx], %d", code.DataLabel(), op.Num)
 		}
 	case SUB:
 		if op.Num == 1 {
-			code.Op("dec byte [%s+ebx]; %s", code.DataLabel(), op)
+			code.Ins("dec", "byte [%s+ebx]", code.DataLabel())
 		} else {
-			code.Op("sub byte [%s+ebx], %d; %s", code.DataLabel(), op.Num, op)
+			code.Ins("sub", "byte [%s+ebx], %d", code.DataLabel(), op.Num)
 		}
 	case DOT:
-		code.Op("push dword [%s+ebx]", code.DataLabel())
+		code.Ins("push", "dword [%s+ebx]", code.DataLabel())
 		for i := 0; i < op.Num; i++ {
-			code.Op("call putchar")
+			code.Ins("call", "putchar")
 		}
-		code.Op("pop ecx")
+		code.Ins("pop", "ecx")
 	case COMMA:
 		for i := 0; i < op.Num; i++ {
-			code.Op("call getchar; ,")
+			code.Ins("call", "getchar")
 		}
-		code.Op("mov [%s+ebx], byte al", code.DataLabel())
+		code.Ins("mov", "[%s+ebx], byte al", code.DataLabel())
 	default:
-		return fmt.Errorf("unsuported op: %s", op)
+		panic(fmt.Errorf("unsuported op: %s", op))
 	}
-	return nil
 }
 
-func CompileLoop(loop Loop, code *Code) error {
+func CompileLoop(loop Loop, code *Code) {
 	start, end := code.LoopLabels()
-	code.Ins("%s:", start)
-	code.Op("mov al, [%s+ebx]", code.DataLabel())
-	code.Op("cmp al, 0")
-	code.Op("je %s", end)
+	code.Label(start)
+	code.Ins("mov", "al, [%s+ebx]", code.DataLabel())
+	code.Ins("cmp", "al, 0")
+	code.Ins("je", end)
 	for _, n := range loop {
-		if err := CompileNode(n, code); err != nil {
-			return err
-		}
+		CompileNode(n, code)
 	}
-	code.Op("jmp %s; ]", start)
-	code.Ins("%s:", end)
-	return nil
+	code.Ins("jmp", start)
+	code.Label(end)
 }
 
-func CompileSetup(code *Code) {
-	code.Ins("extern putchar, getchar")
-	code.Ins("global main")
-	code.Ins("segment .data")
-	code.Ins("%s times %d db 0", code.DataLabel(), code.DataMax())
-	code.Ins("segment .text")
-	code.Ins("main:")
-	code.Op("enter 0, 0")
-	code.Op("pusha")
-	code.Op("mov ebx, 0")
-}
-
-func CompileCleanup(code *Code) {
-	code.Op("popa")
-	code.Op("mov eax, 0")
-	code.Op("leave")
-	code.Op("ret")
-}
-
-func CompileNode(node Node, code *Code) error {
+func CompileNode(node Node, code *Code) {
 	switch node := node.(type) {
 	case Op:
-		return CompileOp(node, code)
+		CompileOp(node, code)
 	case Loop:
-		return CompileLoop(node, code)
+		CompileLoop(node, code)
 	default:
-		return fmt.Errorf("unsuported node: %s", node)
+		panic(fmt.Errorf("unsuported node: %s", node))
 	}
-	return nil
 }
 
-func Compile(p Program) ([]string, error) {
+func Compile(p Program) []string {
 	var code Code
-	CompileSetup(&code)
+	code.Dir("extern putchar, getchar")
+	code.Dir("global main")
+	code.Dir("segment .data")
+	code.Dir("%s times %d db 0", code.DataLabel(), code.DataMax())
+	code.Dir("segment .text")
+	code.Label("main")
+	code.Ins("enter", "0, 0")
+	code.Ins("pusha", "")
+	code.Ins("mov", "ebx, 0")
 	for _, n := range p {
-		if err := CompileNode(n, &code); err != nil {
-			return nil, err
-		}
+		CompileNode(n, &code)
 	}
-	CompileCleanup(&code)
-	return code.Instructions, nil
+	code.Ins("popa", "")
+	code.Ins("mov", "eax, 0")
+	code.Ins("leave", "")
+	code.Ins("ret", "")
+	return code.Instructions
 }
