@@ -19,15 +19,6 @@ func (o Op) String() string {
 	return fmt.Sprintf("(%s:%d)", o.Token, o.Num)
 }
 
-type RepeatedOp struct {
-	Op  Op
-	Num int
-}
-
-func (r RepeatedOp) String() string {
-	return fmt.Sprintf("(%s*%d)", r.Op, r.Num)
-}
-
 type Loop []Node
 
 func (l Loop) String() string {
