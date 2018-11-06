@@ -26,5 +26,10 @@ hello:
 	nasm -f elf32 hello.asm
 	gcc -m32 -o hello hello.o
 
+lostkng:
+	./brainfuck -f examples/lostkng.bf -o lostkng.asm
+	nasm -f elf32 lostkng.asm
+	gcc -m32 -o lostkng lostkng.o
+
 clean:
 	rm -f mandelbrot* life* hanoi* fib* hello*
